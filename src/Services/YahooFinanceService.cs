@@ -13,6 +13,7 @@ using Finance.Net.Mappings;
 using Finance.Net.Models.Yahoo;
 using Finance.Net.Models.Yahoo.Dtos;
 using Finance.Net.Utilities;
+using Finance.Net.Utilities.ProxySupport;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Polly;
@@ -28,6 +29,9 @@ public class YahooFinanceService : IYahooFinanceService
     private readonly IYahooSessionManager _yahooSession;
     private readonly IMapper _mapper;
     private readonly AsyncPolicy _retryPolicy;
+
+    private ProxyServer[]? _proxies;
+    readonly Random _rnd = new Random();
 
     /// <inheritdoc />
     public YahooFinanceService(
@@ -48,6 +52,12 @@ public class YahooFinanceService : IYahooFinanceService
             cfg.AddProfile<YahooQuoteAutomapperProfile>();
         });
         _mapper = config.CreateMapper();
+    }
+
+    /// <inheritdoc />
+    public void SetProxies(ProxyServer[] proxyServers)
+    {
+        _proxies = proxyServers;
     }
 
     /// <inheritdoc />
@@ -95,7 +105,7 @@ public class YahooFinanceService : IYahooFinanceService
     {
         await _yahooSession.RefreshSessionAsync(token).ConfigureAwait(false);
         var crumb = _yahooSession.GetApiCrumb();
-        var httpClient = _httpClientFactory.CreateClient(Constants.YahooHttpClientName);
+        var httpClient = CreateHttpClient();
         var url = $"{Constants.YahooBaseUrlQuoteApi}?" +
             $"&symbols={string.Join(",", symbols).ToLowerInvariant()}" +
             $"&crumb={crumb}";
@@ -141,7 +151,7 @@ public class YahooFinanceService : IYahooFinanceService
     public async Task<IEnumerable<Record>> GetRecordsAsync(string symbol, DateTime? startDate = null, DateTime? endDate = null, CancellationToken token = default)
     {
         await _yahooSession.RefreshSessionAsync(token).ConfigureAwait(false);
-        var httpClient = _httpClientFactory.CreateClient(Constants.YahooHttpClientName);
+        var httpClient = CreateHttpClient();
 
         startDate ??= DateTime.UtcNow.AddDays(-7).Date;
 
@@ -192,7 +202,7 @@ public class YahooFinanceService : IYahooFinanceService
     public async Task<Models.Yahoo.Profile> GetProfileAsync(string symbol, CancellationToken token = default)
     {
         await _yahooSession.RefreshSessionAsync(token).ConfigureAwait(false);
-        var httpClient = _httpClientFactory.CreateClient(Constants.YahooHttpClientName);
+        var httpClient = CreateHttpClient();
         var url = $"{Constants.YahooBaseUrlQuoteHtml}/{symbol}/profile/".ToLowerInvariant();
 
         try
@@ -215,7 +225,7 @@ public class YahooFinanceService : IYahooFinanceService
     public async Task<Dictionary<string, FinancialReport>> GetFinancialsAsync(string symbol, CancellationToken token = default)
     {
         await _yahooSession.RefreshSessionAsync(token).ConfigureAwait(false);
-        var httpClient = _httpClientFactory.CreateClient(Constants.YahooHttpClientName);
+        var httpClient = CreateHttpClient();
         var url = $"{Constants.YahooBaseUrlQuoteHtml}/{symbol}/financials/".ToLowerInvariant();
 
         try
@@ -238,7 +248,7 @@ public class YahooFinanceService : IYahooFinanceService
     public async Task<Summary> GetSummaryAsync(string symbol, CancellationToken token = default)
     {
         await _yahooSession.RefreshSessionAsync(token).ConfigureAwait(false);
-        var httpClient = _httpClientFactory.CreateClient(Constants.YahooHttpClientName);
+        var httpClient = CreateHttpClient();
         var url = $"{Constants.YahooBaseUrlQuoteHtml}/{symbol}/?nojs=true".ToLowerInvariant();
 
         try
@@ -261,7 +271,7 @@ public class YahooFinanceService : IYahooFinanceService
     {
         var result = new List<Instrument>();
         await _yahooSession.RefreshSessionAsync(token).ConfigureAwait(false);
-        var httpClient = _httpClientFactory.CreateClient(Constants.YahooHttpClientName);
+        var httpClient = CreateHttpClient();
 
         try
         {
@@ -302,6 +312,19 @@ public class YahooFinanceService : IYahooFinanceService
             {
                 return result;
             }
+        }
+    }
+
+    private HttpClient CreateHttpClient()
+    {
+        if (_proxies == null || _proxies.Length == 0)
+        {
+            return _httpClientFactory.CreateClient(Constants.YahooHttpClientName);
+        }
+        else
+        {
+            int randomProxyIdx = _rnd.Next(_proxies.Length);
+            return _httpClientFactory.CreateClient($"{Constants.YahooHttpClientName}_{randomProxyIdx}");
         }
     }
 
