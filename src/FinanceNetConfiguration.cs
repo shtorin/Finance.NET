@@ -1,4 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using Finance.Net.Utilities.ProxySupport;
 
 namespace Finance.Net;
 
@@ -15,4 +17,6 @@ public class FinanceNetConfiguration
 
     /// <summary> Alpha Vantage API Key, default null </summary>
     public string? AlphaVantageApiKey { get; set; }
+
+    public ProxyServer[]? Proxies { get; set; }
 }
