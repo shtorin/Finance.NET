@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Finance.Net.Enums;
 using Finance.Net.Models.Yahoo;
+using Finance.Net.Utilities.ProxySupport;
 
 namespace Finance.Net.Interfaces;
 
@@ -12,6 +13,10 @@ namespace Finance.Net.Interfaces;
 /// </summary>
 public interface IYahooFinanceService
 {
+    /// <summary>
+    /// Set proxies list to access yahoo finance
+    /// </summary>    
+    void SetProxies(ProxyServer[] proxyServers);
     /// <summary>
     /// Retrieves a collection of instruments.
     /// </summary>
